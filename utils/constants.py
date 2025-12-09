@@ -1,1 +1,1 @@
-DIFFUSION_MODEL_ID = "stable-diffusion-v1-5/stable-diffusion-v1-5"
+DIFFUSION_MODEL_ID = "eniora/Juggernaut_XL_Ragnarok"

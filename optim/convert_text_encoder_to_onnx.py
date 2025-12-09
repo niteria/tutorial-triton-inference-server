@@ -2,15 +2,15 @@ import os
 import torch
 import numpy
 import onnxruntime as ort
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusionXLPipeline
 from utils import *
 from torch.export import Dim
 
-pipe = StableDiffusionPipeline.from_pretrained(DIFFUSION_MODEL_ID, torch_dtype=torch.float16)
+pipe = StableDiffusionXLPipeline.from_pretrained(DIFFUSION_MODEL_ID, torch_dtype=torch.float32)
 TEXT_ENCODER_DIR = os.path.join(MODELS_DIR_PATH, "text_encoder")
 os.makedirs(TEXT_ENCODER_DIR, exist_ok=True)
 TEXT_ENCODER_ONNX_PATH = os.path.join(TEXT_ENCODER_DIR, "model.onnx")
-text_encoder = pipe.text_encoder.to(dtype=torch.float16).eval().to("cuda")  # Explicit fp16 conversion
+text_encoder = pipe.text_encoder.to(dtype=torch.float32).eval().to("cuda")  # Explicit fp16 conversion
 batch_dim = Dim("batch", min=1, max=4)  # Adjust max as needed; omit for unbounded
 dynamic_shapes = {
     "input_ids": {0: batch_dim},
