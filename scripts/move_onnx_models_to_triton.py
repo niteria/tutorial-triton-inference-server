@@ -17,6 +17,7 @@ for name in folder_names:
 
     if os.path.isfile(path_source_model):
         shutil.copy2(path_source_model, path_destination_model)
+        shutil.copy2(path_source_model+".data", path_destination_model+".data")
         print(f"Copied: {path_source_model} → {path_destination_model}")
     else:
         print(f"Skipped (not found): {path_source_model}")

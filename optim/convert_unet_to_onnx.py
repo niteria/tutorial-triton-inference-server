@@ -1,5 +1,6 @@
 import os
 import torch
+import onnx
 import numpy
 import onnxruntime as ort
 from diffusers import StableDiffusionPipeline
@@ -15,11 +16,11 @@ unet.eval()
 batch_dim = Dim("batch", min=1, max=4)  # Adjust max as needed; omit for unbounded
 dynamic_shapes = {
     "sample": {0: batch_dim},
-    "timestep": {0: batch_dim},
+    "timestep": {},
     "encoder_hidden_states": {0: batch_dim},
 }
 sample_input = torch.randn((2, 4, 64, 64)).to(torch.float16).to("cuda")
-timestep_input = torch.randn((2,)).to(torch.float16).to("cuda")
+timestep_input = torch.randn((1,)).to(torch.float16).to("cuda")
 encoder_hidden_states_input = torch.randn((2, 77, 768)).to(torch.float16).to("cuda")
 with torch.no_grad():
     torch.onnx.export(
@@ -32,8 +33,12 @@ with torch.no_grad():
         output_names=["outputs"],
         opset_version=18
     )
+
+onnx_model = onnx.load(path_unet_onnx)
+onnx.save(onnx_model, path_unet_onnx, save_as_external_data=False)  # Saves embedded
+
 sample = torch.randn((2, 4, 64, 64)).to(torch.float16).to("cuda")
-timestep = torch.randn((2,)).to(torch.float16).to("cuda")
+timestep = torch.randn((1,)).to(torch.float16).to("cuda")
 encoder_hidden_states = torch.randn((2, 77, 768)).to(torch.float16).to("cuda")
 with torch.no_grad():
     output_pytorch = unet(sample, timestep, encoder_hidden_states)

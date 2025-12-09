@@ -1,6 +1,6 @@
 import inspect
 import torch
-import numpy 
+import numpy
 import triton_python_backend_utils as pb_utils
 
 from transformers                import CLIPTokenizer
@@ -45,7 +45,7 @@ def retrieve_timesteps(
     return timesteps, num_inference_steps
 
 class TritonPythonModel:
-    
+
     def initialize(self, args):
         self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         self.scheduler = PNDMScheduler(
@@ -92,7 +92,7 @@ class TritonPythonModel:
         inference_request = pb_utils.InferenceRequest(
             model_name = "text_encoder",
             inputs = [
-                pb_utils.Tensor.from_dlpack("tokens", torch.to_dlpack(text_input_ids.to(torch.int64))),
+                pb_utils.Tensor.from_dlpack("input_ids", torch.to_dlpack(text_input_ids.to(torch.int64))),
             ],
             requested_output_names = ["last_hidden_state"]
         )
@@ -143,7 +143,7 @@ class TritonPythonModel:
             inference_request = pb_utils.InferenceRequest(
                 model_name = "text_encoder",
                 inputs = [
-                    pb_utils.Tensor.from_dlpack("tokens", torch.to_dlpack(uncond_input.input_ids.to(torch.int64))),
+                    pb_utils.Tensor.from_dlpack("input_ids", torch.to_dlpack(uncond_input.input_ids.to(torch.int64))),
                 ],
                 requested_output_names = ["last_hidden_state"]
             )

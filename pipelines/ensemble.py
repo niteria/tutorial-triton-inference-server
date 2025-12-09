@@ -1,5 +1,5 @@
 import inspect
-import numpy 
+import numpy
 import torch
 import tritonclient.grpc as grpcclient
 
@@ -87,7 +87,7 @@ class StableDiffusionPipelineEnsemble():
         )
 
         tokens_numpy = text_inputs.input_ids.cpu().numpy().astype(numpy.int64)
-        tokens_input = grpcclient.InferInput("tokens", tokens_numpy.shape, "INT64")
+        tokens_input = grpcclient.InferInput("input_ids", tokens_numpy.shape, "INT64")
         tokens_input.set_data_from_numpy(tokens_numpy)
 
         result = self.client.infer(
@@ -135,7 +135,7 @@ class StableDiffusionPipelineEnsemble():
 
             tokens_numpy = uncond_input.input_ids.cpu().numpy().astype(numpy.int64)
 
-            tokens_input = grpcclient.InferInput("tokens", tokens_numpy.shape, "INT64")
+            tokens_input = grpcclient.InferInput("input_ids", tokens_numpy.shape, "INT64")
             tokens_input.set_data_from_numpy(tokens_numpy)
 
             result = self.client.infer(

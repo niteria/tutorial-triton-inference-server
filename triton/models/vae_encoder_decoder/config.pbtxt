@@ -24,11 +24,11 @@ ensemble_scheduling {
       model_name: "vae_encoder"
       model_version: 2
       input_map {
-        key: "image"
+        key: "sample"
         value: "image"
       }
       output_map {
-        key: "sample"
+        key: "latent"
         value: "sample_latents"
       }
     },

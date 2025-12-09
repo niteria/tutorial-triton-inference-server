@@ -6,7 +6,7 @@ max_batch_size: 0
 version_policy: { specific { versions: [2] } }
 input [
   {
-    name: "tokens"
+    name: "input_ids"
     data_type: TYPE_INT64
     dims: [ -1, 77]
   }
