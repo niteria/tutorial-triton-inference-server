@@ -95,7 +95,7 @@ class StableDiffusionXLPipelineEnsemble():
             outputs=[grpcclient.InferRequestedOutput("last_hidden_state")]
         )
         last_hidden_state_numpy = result.as_numpy("last_hidden_state")
-        hidden_states_1 = torch.from_numpy(last_hidden_state_numpy).to(device=device, dtype=torch.float16)
+        hidden_states_1 = torch.from_numpy(last_hidden_state_numpy).to(device=device, dtype=torch.float32)
         hidden_states_1 = hidden_states_1.to(dtype=torch.float32, device=device)
 
         # Second text encoder
@@ -118,14 +118,13 @@ class StableDiffusionXLPipelineEnsemble():
             inputs=[tokens_input_2],
             outputs=outputs_2
         )
-        last_hidden_state_numpy_2 = result_2.as_numpy("last_hidden_state")
-        hidden_states_2 = torch.from_numpy(last_hidden_state_numpy_2).to(device=device, dtype=torch.float16)
+        # Swap these to correct the misnamed outputs
+        last_hidden_state_numpy_2 = result_2.as_numpy("pooler_output")  # Actual last_hidden_state
+        pooler_output_numpy = result_2.as_numpy("last_hidden_state")  # Actual pooler_output
+        hidden_states_2 = torch.from_numpy(last_hidden_state_numpy_2).to(device=device, dtype=torch.float32)
         hidden_states_2 = hidden_states_2.to(dtype=torch.float32, device=device)
-        pooler_output_numpy = result_2.as_numpy("pooler_output")
-        add_text_embeds = torch.from_numpy(pooler_output_numpy).to(device=device, dtype=torch.float16)
+        add_text_embeds = torch.from_numpy(pooler_output_numpy).to(device=device, dtype=torch.float32)
         add_text_embeds = add_text_embeds.to(dtype=torch.float32, device=device)
-        print("hidden_states_1 shape:", hidden_states_1.shape)
-        print("hidden_states_2 shape:", hidden_states_2.shape)
 
         prompt_embeds = torch.cat([hidden_states_1, hidden_states_2], dim=-1)
 
@@ -166,7 +165,7 @@ class StableDiffusionXLPipelineEnsemble():
                 outputs=[grpcclient.InferRequestedOutput("last_hidden_state")]
             )
             last_hidden_state_numpy = result.as_numpy("last_hidden_state")
-            neg_hidden_states_1 = torch.from_numpy(last_hidden_state_numpy).to(device=device, dtype=torch.float16)
+            neg_hidden_states_1 = torch.from_numpy(last_hidden_state_numpy).to(device=device, dtype=torch.float32)
             neg_hidden_states_1 = neg_hidden_states_1.to(dtype=torch.float32, device=device)
 
             # Negative second encoder
@@ -185,11 +184,12 @@ class StableDiffusionXLPipelineEnsemble():
                 inputs=[tokens_input_2],
                 outputs=outputs_2
             )
-            last_hidden_state_numpy_2 = result_2.as_numpy("last_hidden_state")
-            neg_hidden_states_2 = torch.from_numpy(last_hidden_state_numpy_2).to(device=device, dtype=torch.float16)
+            # Swap these to correct the misnamed outputs
+            last_hidden_state_numpy_2 = result_2.as_numpy("pooler_output")  # Actual last_hidden_state
+            pooler_output_numpy = result_2.as_numpy("last_hidden_state")  # Actual pooler_output
+            neg_hidden_states_2 = torch.from_numpy(last_hidden_state_numpy_2).to(device=device, dtype=torch.float32)
             neg_hidden_states_2 = neg_hidden_states_2.to(dtype=torch.float32, device=device)
-            pooler_output_numpy = result_2.as_numpy("pooler_output")
-            neg_add_text_embeds = torch.from_numpy(pooler_output_numpy).to(device=device, dtype=torch.float16)
+            neg_add_text_embeds = torch.from_numpy(pooler_output_numpy).to(device=device, dtype=torch.float32)
             neg_add_text_embeds = neg_add_text_embeds.to(dtype=torch.float32, device=device)
 
             negative_prompt_embeds = torch.cat([neg_hidden_states_1, neg_hidden_states_2], dim=-1)
@@ -235,8 +235,8 @@ class StableDiffusionXLPipelineEnsemble():
     def __call__(
         self,
         prompt: Union[str, List[str]] = None,
-        height: Optional[int] = 1024,
-        width: Optional[int] = 1024,
+        height: Optional[int] = 512,
+        width: Optional[int] = 512,
         num_inference_steps: int = 50,
         guidance_scale: float = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
@@ -286,23 +286,25 @@ class StableDiffusionXLPipelineEnsemble():
         self._num_timesteps = len(timesteps)
         with tqdm(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
+                # expand the latents if we are doing classifier free guidance
                 latent_model_input = torch.cat([latents] * 2) if self.do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                sample_numpy = latent_model_input.cpu().numpy().astype(numpy.float16)
-                timestep_numpy = t[None].cpu().numpy().astype(numpy.float16)
-                encoder_hidden_states_numpy = prompt_embeds.cpu().numpy().astype(numpy.float16)
-                text_embeds_numpy = add_text_embeds.cpu().numpy().astype(numpy.float16)
-                time_ids_numpy = add_time_ids.cpu().numpy().astype(numpy.float16)
+                effective_batch = latent_model_input.shape[0]
+                sample_numpy = latent_model_input.cpu().numpy().astype(numpy.float32)
+                timestep_numpy = t.repeat(effective_batch).cpu().numpy().astype(numpy.float32)
+                encoder_hidden_states_numpy = prompt_embeds.cpu().numpy().astype(numpy.float32)
+                text_embeds_numpy = add_text_embeds.cpu().numpy().astype(numpy.float32)
+                time_ids_numpy = add_time_ids.cpu().numpy().astype(numpy.float32)
 
-                input_sample = grpcclient.InferInput("sample", sample_numpy.shape, "FP16")
+                input_sample = grpcclient.InferInput("sample", sample_numpy.shape, "FP32")
                 input_sample.set_data_from_numpy(sample_numpy)
-                input_timestep = grpcclient.InferInput("timestep", timestep_numpy.shape, "FP16")
+                input_timestep = grpcclient.InferInput("timestep", timestep_numpy.shape, "FP32")
                 input_timestep.set_data_from_numpy(timestep_numpy)
-                input_encoder_hidden_states = grpcclient.InferInput("encoder_hidden_states", encoder_hidden_states_numpy.shape, "FP16")
+                input_encoder_hidden_states = grpcclient.InferInput("encoder_hidden_states", encoder_hidden_states_numpy.shape, "FP32")
                 input_encoder_hidden_states.set_data_from_numpy(encoder_hidden_states_numpy)
-                input_text_embeds = grpcclient.InferInput("text_embeds", text_embeds_numpy.shape, "FP16")
+                input_text_embeds = grpcclient.InferInput("text_embeds", text_embeds_numpy.shape, "FP32")
                 input_text_embeds.set_data_from_numpy(text_embeds_numpy)
-                input_time_ids = grpcclient.InferInput("time_ids", time_ids_numpy.shape, "FP16")
+                input_time_ids = grpcclient.InferInput("time_ids", time_ids_numpy.shape, "FP32")
                 input_time_ids.set_data_from_numpy(time_ids_numpy)
 
                 result = self.client.infer(
@@ -311,7 +313,7 @@ class StableDiffusionXLPipelineEnsemble():
                     outputs=[grpcclient.InferRequestedOutput("outputs")]
                 )
                 output_numpy = result.as_numpy("outputs")
-                noise_pred = torch.from_numpy(output_numpy).to(device=latent_model_input.device, dtype=torch.float16)
+                noise_pred = torch.from_numpy(output_numpy).to(device=latent_model_input.device, dtype=torch.float32)
                 if self.do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
@@ -319,8 +321,8 @@ class StableDiffusionXLPipelineEnsemble():
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
 
-        latents_numpy = (latents / 0.18215).cpu().numpy().astype(numpy.float16)
-        vae_input = grpcclient.InferInput("sample", latents_numpy.shape, "FP16")
+        latents_numpy = (latents / 0.18215).cpu().numpy().astype(numpy.float32)
+        vae_input = grpcclient.InferInput("sample", latents_numpy.shape, "FP32")
         vae_input.set_data_from_numpy(latents_numpy)
         result = self.client.infer(
             model_name="vae_decoder",
@@ -328,7 +330,7 @@ class StableDiffusionXLPipelineEnsemble():
             outputs=[grpcclient.InferRequestedOutput("image")]
         )
         result = result.as_numpy("image")
-        image = torch.tensor(result, dtype=torch.float16)
+        image = torch.tensor(result, dtype=torch.float32)
         image = (image / 2 + 0.5).clamp(0, 1) * 255
         image = image.cpu().permute(0, 2, 3, 1).float().numpy().astype(numpy.uint8)
         return image

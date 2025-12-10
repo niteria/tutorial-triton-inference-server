@@ -3,7 +3,8 @@ from PIL import Image  # Add this import
 
 if __name__ == "__main__":
     pipe = StableDiffusionXLPipelineEnsemble()
-    image = pipe(prompt="a cat", seed=42)
+    prompt = "cat in a jungle, cold color palette, muted colors, detailed, 8k"
+    image = pipe(prompt=prompt, seed=42)
     print("Image shape:", image.shape)
 
     img = Image.fromarray(image[0])
