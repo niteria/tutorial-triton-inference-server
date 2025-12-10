@@ -1,0 +1,5 @@
+unet needs to be dynamic:
+
+&&&& PASSED TensorRT.trtexec [TensorRT v101401] [b48] # trtexec --onnx=./1/model.onnx --saveEngine=./2/model.plan --minShapes=sample:1x4x64x64,timestep:1,encoder_hidden_states:1x77x2048,text_embeds:1x1280,time_ids:1x6 --optShapes=sample:2x4x64x64,timestep:2,encoder_hidden_states:2x77x2048,text_embeds:2x1280,time_ids:2x6 --maxShapes=sample:4x4x64x64,timestep:4,encoder_hidden_states:4x77x2048,text_embeds:4x1280,time_ids:4x6
+root@198390295f90:/workspace/triton/models/unet#
+exit
